@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/schema"
 )
 
 type capitalizeInput struct {
@@ -16,7 +18,7 @@ type capitalizeInput struct {
 }
 
 type capitalizeOutput struct {
-	Err  `json:"error"`
+	Err  `json:"error,omitempty"`
 	Name string `json:"name,omitempty"`
 }
 
@@ -180,8 +182,8 @@ func TestEncodingError(t *testing.T) {
 }
 
 func TestUsage(t *testing.T) {
-	hio := IO{}
-	r, _ := http.NewRequest("GET", "/", nil)
+	hio := NewJSON(schema.NewDecoder(), nil)
+	r, _ := http.NewRequest("GET", "?Name=my-name", nil)
 	w := httptest.NewRecorder()
 
 	in := &capitalizeInput{}
@@ -189,5 +191,7 @@ func TestUsage(t *testing.T) {
 		render(capitalize(in))
 	}
 
-	//@TODO assert
+	if w.Body.String() != `{"name":"MY-NAME"}`+"\n" {
+		t.Fatalf("expected name to be capitalized, got: %s", w.Body)
+	}
 }

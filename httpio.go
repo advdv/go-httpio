@@ -2,6 +2,7 @@ package httpio
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -43,6 +44,20 @@ type IO struct {
 	Encoders       map[string]func(io.Writer) Encoder
 	FormDecoder    FormDecoder
 	InputValidator InputValidator
+}
+
+//NewJSON returns an http io setup that is just for json input and output
+func NewJSON(fdec FormDecoder, val InputValidator) *IO {
+	return &IO{
+		Decoders: map[string]func(io.Reader) Decoder{
+			"application/json": func(r io.Reader) Decoder { return json.NewDecoder(r) },
+		},
+		Encoders: map[string]func(io.Writer) Encoder{
+			"application/json": func(w io.Writer) Encoder { return json.NewEncoder(w) },
+		},
+		FormDecoder:    fdec,
+		InputValidator: val,
+	}
 }
 
 //Decoder is used for non-form values such as JSON and XML.
