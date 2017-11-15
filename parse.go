@@ -18,10 +18,6 @@ func (pe herr) Error() string {
 	return fmt.Sprintf("%s: %s", pe.code, pe.message)
 }
 
-func (pe herr) Code() ErrType {
-	return pe.Code()
-}
-
 //parse will attemp to parse request 'r' into input 'in' and return an error when it fails
 func (hio *IO) parse(r *http.Request, in interface{}) error {
 	err := r.ParseForm()

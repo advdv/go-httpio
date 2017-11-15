@@ -181,6 +181,20 @@ func TestEncodingError(t *testing.T) {
 	//changed after the body has been written
 }
 
+func TestIsErrType(t *testing.T) {
+	if IsErrType(nil, ErrParseForm) {
+		t.Fatal("should not be considered this error")
+	}
+
+	if IsErrType(errors.New("foo"), ErrParseForm) {
+		t.Fatal("should not be considered this error")
+	}
+
+	if !IsErrType(herr{code: ErrParseForm}, ErrParseForm) {
+		t.Fatal("expected the error to match the code")
+	}
+}
+
 func TestUsage(t *testing.T) {
 	hio := NewJSON(schema.NewDecoder(), nil)
 	r, _ := http.NewRequest("GET", "?Name=my-name", nil)

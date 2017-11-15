@@ -11,6 +11,20 @@ import (
 //ErrType is used to describe certain errors
 type ErrType string
 
+//IsErrType allows assertion of errors to be of a specific encoding type
+func IsErrType(e error, etype ErrType) bool {
+	if e == nil {
+		return etype == ""
+	}
+
+	errh, ok := e.(herr)
+	if !ok {
+		return false
+	}
+
+	return errh.code == etype
+}
+
 const (
 	//ErrParseForm indicates an error form encoded values
 	ErrParseForm = ErrType("ERR_PARSE_FORM")
@@ -93,9 +107,10 @@ func (err *Err) BoxErr(e error) {
 //UnboxErr returns nil if the embedding struct doesn't have an error value
 //embedded or the actual error if it does
 func (err *Err) UnboxErr() error {
-	if *err == "" {
+	if err == nil || *err == "" {
 		return nil
 	}
+
 	return errors.New(string(*err))
 }
 
