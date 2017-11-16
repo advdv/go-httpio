@@ -11,6 +11,8 @@ sits between your router and your business logic and takes care of boring stuff 
 - pluggable encoders and decoders
 - plugin form decoding
 - custom rendering into parsing logic
+- plugin validation
 
-- TODO: plugin validation
+
+- TODO: increase test coverage
 - TODO: context value injection using tags

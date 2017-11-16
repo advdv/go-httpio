@@ -8,8 +8,14 @@ import (
 	"github.com/advanderveer/go-httpio/handling"
 )
 
+//Validator is an interface that allows validation
+type Validator interface {
+	Validate(v interface{}) error
+}
+
 //Ctrl allows for handling HTTP by defining supported encoding schemes
 type Ctrl struct {
+	V Validator
 	H *handling.H
 }
 
@@ -34,7 +40,14 @@ func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in, errOut interfa
 		return nil, false
 	}
 
-	//@TODO validate, then box (in errOut) or render error
+	if c.V != nil {
+		err := c.V.Validate(in)
+		if err != nil {
+			errOut, _ = errbox.Box(errOut, err)
+			c.H.MustRender(r.Header, w, errOut)
+			return nil, false
+		}
+	}
 
 	return func(out interface{}, err error) {
 		out, _ = errbox.Box(out, err)
