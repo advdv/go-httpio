@@ -15,9 +15,17 @@ func NewStack(def Encoding, others ...Encoding) Stack {
 //Default returns the first avaible encoding set
 func (s Stack) Default() (Encoding, error) {
 	if len(s) < 1 {
-		return nil, errors.New("No encoding configured")
+		return nil, errors.New("No encodings configured")
 	}
 	return s[0], nil
+}
+
+//Supported lists all media types by the encoding stack in order of preference
+func (s Stack) Supported() (supported []string) {
+	for _, enc := range s {
+		supported = append(supported, enc.MimeType())
+	}
+	return supported
 }
 
 //Find an encoding mechanism by its mime type: O(N). Returns

@@ -71,7 +71,7 @@ func (e *FormDecoder) Decode(v interface{}) error {
 }
 
 //MimeType will report the EncodingMimeType
-func (e *Form) MimeType() string { return "application/x-www-form-urlencoded" }
+func (e *Form) MimeType() string { return MediaTypeForm }
 
 //Encoder will create encoders
 func (e *Form) Encoder(w io.Writer) Encoder { return &FormEncoder{e.enc, w} }

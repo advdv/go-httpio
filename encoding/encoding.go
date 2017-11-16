@@ -6,6 +6,17 @@ import (
 	"io"
 )
 
+var (
+	//MediaTypeJSON identifies JSON content
+	MediaTypeJSON = "application/json"
+
+	//MediaTypeXML identifies XML content
+	MediaTypeXML = "application/xml"
+
+	//MediaTypeForm identifies form content
+	MediaTypeForm = "application/x-www-form-urlencoded"
+)
+
 //Decoder is used for decoding into v from reader inside the decoder
 type Decoder interface {
 	Decode(v interface{}) error
@@ -27,7 +38,7 @@ type Encoding interface {
 type XML struct{}
 
 //MimeType will report the EncodingMimeType
-func (e *XML) MimeType() string { return "application/xml" }
+func (e *XML) MimeType() string { return MediaTypeXML }
 
 //Encoder will create encoders
 func (e *XML) Encoder(w io.Writer) Encoder { return xml.NewEncoder(w) }
@@ -39,7 +50,7 @@ func (e *XML) Decoder(r io.Reader) Decoder { return xml.NewDecoder(r) }
 type JSON struct{}
 
 //MimeType will report the EncodingMimeType
-func (e *JSON) MimeType() string { return "application/json" }
+func (e *JSON) MimeType() string { return MediaTypeJSON }
 
 //Encoder will create encoders
 func (e *JSON) Encoder(w io.Writer) Encoder { return json.NewEncoder(w) }

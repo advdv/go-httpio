@@ -1,6 +1,9 @@
 package encoding
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestStack(t *testing.T) {
 	stack1 := make(Stack, 0)
@@ -27,5 +30,10 @@ func TestStack(t *testing.T) {
 	enc3 := stack2.Find("foo/bar")
 	if enc3 != nil {
 		t.Fatal("should not be able to find bogus encoding")
+	}
+
+	supp := stack2.Supported()
+	if !reflect.DeepEqual(supp, []string{"application/json", "application/xml"}) {
+		t.Fatal("expected media types in order")
 	}
 }
