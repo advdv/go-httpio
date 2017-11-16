@@ -26,7 +26,7 @@ func TestDefaultParse(t *testing.T) {
 		Body     string
 		Headers  http.Header
 		ExpInput *testInput //we expect the body to be parsed into the input like this
-		ExpErr   error
+		ExpErr   error      //@TODO we want to assert for behaviour: https://dave.cheney.net/2014/12/24/inspecting-errors
 	}{
 		{
 			Name: "plain GET should not decode as it has no content",
