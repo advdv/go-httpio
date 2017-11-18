@@ -3,6 +3,7 @@ package httpio_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +38,71 @@ func (val *val) Validate(v interface{}) error {
 	return val.v.Struct(v)
 }
 
-func TestBasicUsage(t *testing.T) {
+func TestClientUsage(t *testing.T) {
+	for _, c := range []struct {
+		Name      string
+		Method    string
+		Path      string
+		Hdr       http.Header
+		Ctrl      *httpio.Ctrl
+		Input     *testInput
+		Output    *testOutput
+		ExpErr    error
+		ExpOutput *testOutput
+		Impl      func(context.Context, *testInput) (*testOutput, error)
+	}{
+		{
+			Name:      "nil output",
+			Method:    http.MethodGet,
+			Output:    &testOutput{},
+			ExpOutput: &testOutput{},
+			Path:      "",
+			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+				return nil, nil
+			},
+		},
+		{
+			Name:      "return error",
+			Method:    http.MethodGet,
+			Output:    &testOutput{},
+			ExpOutput: &testOutput{},
+			ExpErr:    errors.New("foo"),
+			Path:      "",
+			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+				return nil, errors.New("foo")
+			},
+		},
+	} {
+		t.Run(c.Name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				in := &testInput{}
+				if render, valid := c.Ctrl.Handle(w, r, in, &testOutput{}); valid {
+					render(c.Impl(r.Context(), in))
+				}
+			}))
+			defer ts.Close()
+
+			client, err := httpio.NewClient(ts.Client(), ts.URL, &encoding.JSON{})
+			if err != nil {
+				t.Fatal("failed to create client:", err)
+			}
+
+			err = client.Request(context.Background(), c.Method, c.Path, c.Hdr, c.Input, c.Output)
+			if fmt.Sprint(err) != fmt.Sprint(c.ExpErr) {
+				t.Fatalf("expected err '%v', got: '%v'", c.ExpErr, err)
+			}
+
+			if !reflect.DeepEqual(c.Output, c.ExpOutput) {
+				t.Fatalf("expected output '%v', got: %v", c.ExpOutput, c.Output)
+			}
+
+		})
+	}
+}
+
+func TestUsageWithoutClient(t *testing.T) {
 	for _, c := range []struct {
 		Name      string
 		Method    string
@@ -64,6 +129,20 @@ func TestBasicUsage(t *testing.T) {
 			},
 		},
 		{
+			Name:      "GET an nil output struct",
+			Method:    http.MethodGet,
+			Path:      "",
+			Body:      nil,
+			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			ExpBody:   `null` + "\n",
+			ExpStatus: http.StatusOK,
+			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+				return nil, nil
+			},
+		},
+
+		{
 			Name:      "GET return nil and error",
 			Method:    http.MethodGet,
 			Path:      "",
@@ -71,7 +150,10 @@ func TestBasicUsage(t *testing.T) {
 			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
 			ExpBody:   `{"message":"foo"}` + "\n",
 			ExpStatus: http.StatusInternalServerError,
-			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpHdr: http.Header{
+				"Content-Type":         []string{"application/json; charset=utf-8"},
+				"X-Has-Handling-Error": []string{"1"},
+			},
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return nil, errors.New("foo")
 			},
@@ -113,7 +195,10 @@ func TestBasicUsage(t *testing.T) {
 			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
 			ExpBody:   `{"message":"Key: 'testInput.Name' Error:Field validation for 'Name' failed on the 'ascii' tag"}` + "\n",
 			ExpStatus: http.StatusBadRequest,
-			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpHdr: http.Header{
+				"Content-Type":         []string{"application/json; charset=utf-8"},
+				"X-Has-Handling-Error": []string{"1"},
+			},
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return &testOutput{Result: in.Name + in.Position}, nil
 			},
@@ -127,7 +212,10 @@ func TestBasicUsage(t *testing.T) {
 			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
 			ExpBody:   `{"message":"unexpected EOF"}` + "\n",
 			ExpStatus: http.StatusBadRequest,
-			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpHdr: http.Header{
+				"Content-Type":         []string{"application/json; charset=utf-8"},
+				"X-Has-Handling-Error": []string{"1"},
+			},
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return &testOutput{Result: in.Name + in.Position}, nil
 			},

@@ -6,12 +6,6 @@ import (
 	"net/http"
 )
 
-//ErrOutput is the struct that is encoded when a generic error
-//value reaches the render method
-type ErrOutput struct {
-	Message string `json:"message" form:"message" schema:"message"`
-}
-
 //Renderable indicates that a type is able to render itself
 type Renderable interface {
 	Render(hdr http.Header, w http.ResponseWriter) error
@@ -55,7 +49,8 @@ func (h *H) Render(hdr http.Header, w http.ResponseWriter, v interface{}) error 
 			status = http.StatusInternalServerError
 		}
 
-		v = ErrOutput{Message: errv.Error()}
+		w.Header().Set(HeaderHandlingError, "1")
+		v = Err{Message: errv.Error()}
 	}
 
 	if status == -1 {

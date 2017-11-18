@@ -94,9 +94,12 @@ func TestRender(t *testing.T) {
 			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
 			Value:      errors.New("foo"),
 			ExpContent: `{"message":"foo"}` + "\n",
-			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			ExpError:   nil,
-			ExpStatus:  http.StatusInternalServerError,
+			ExpHdr: http.Header{
+				"Content-Type":         []string{"application/json; charset=utf-8"},
+				"X-Has-Handling-Error": []string{"1"},
+			},
+			ExpError:  nil,
+			ExpStatus: http.StatusInternalServerError,
 		},
 		{
 			Name: "render custom error",
@@ -106,9 +109,12 @@ func TestRender(t *testing.T) {
 			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
 			Value:      notFoundErr("not found"),
 			ExpContent: `{"message":"not found"}` + "\n",
-			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			ExpError:   nil,
-			ExpStatus:  http.StatusNotFound,
+			ExpHdr: http.Header{
+				"Content-Type":         []string{"application/json; charset=utf-8"},
+				"X-Has-Handling-Error": []string{"1"},
+			},
+			ExpError:  nil,
+			ExpStatus: http.StatusNotFound,
 		},
 		{
 			Name: "custom rendering that fails on type",
@@ -119,9 +125,12 @@ func TestRender(t *testing.T) {
 			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
 			Value:      renderMyselfFail("world"),
 			ExpContent: `{"message":"my rendering error"}` + "\n",
-			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			ExpError:   nil,
-			ExpStatus:  http.StatusInternalServerError,
+			ExpHdr: http.Header{
+				"Content-Type":         []string{"application/json; charset=utf-8"},
+				"X-Has-Handling-Error": []string{"1"},
+			},
+			ExpError:  nil,
+			ExpStatus: http.StatusInternalServerError,
 		},
 	} {
 		t.Run(c.Name, func(t *testing.T) {
