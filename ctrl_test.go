@@ -69,7 +69,7 @@ func TestClientUsage(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				in := &testInput{}
-				if render, valid := c.Ctrl.Handle(w, r, in, &testOutput{}); valid {
+				if render, valid := c.Ctrl.Handle(w, r, in); valid {
 					render(c.Impl(r.Context(), in))
 				}
 			}))
@@ -201,7 +201,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			r.Header = c.Hdr
 			func(w http.ResponseWriter, r *http.Request) {
 				in := &testInput{}
-				if render, valid := c.Ctrl.Handle(w, r, in, &testOutput{}); valid {
+				if render, valid := c.Ctrl.Handle(w, r, in); valid {
 					render(c.Impl(r.Context(), in))
 				}
 			}(w, r)

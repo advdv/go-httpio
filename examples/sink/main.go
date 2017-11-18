@@ -1,22 +1,20 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	httpio "github.com/advanderveer/go-httpio"
 	"github.com/advanderveer/go-httpio/encoding"
-	"github.com/gorilla/mux"
 	"github.com/monoculum/formam"
-	"gopkg.in/go-playground/validator.v9"
+	"github.com/roobre/gorilla-mux"
 )
 
-type inputValidator struct {
-	v *validator.Validate
-}
+type myService struct{}
 
-func (ip *inputValidator) Validate(v interface{}) error {
-	return ip.v.Struct(v)
+func (s *myService) Echo(ctx context.Context, in map[string]interface{}) (map[string]interface{}, error) {
+	return in, nil
 }
 
 type formDecoder struct {
@@ -28,21 +26,19 @@ func (fd *formDecoder) Decode(dst interface{}, vs map[string][]string) error {
 }
 
 func main() {
-	r := mux.NewRouter()
+	r := mux.NewRouter() //route requests to handlers
+
 	ctrl := httpio.NewCtrl(
-		&inputValidator{validator.New()},
 		&encoding.JSON{},
 		encoding.NewFormEncoding(nil, &formDecoder{formam.NewDecoder(nil)}),
-	)
+	) //request parsing and response rendering (including errors)
+
+	svc := &myService{} //services implement business logic
 
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		in := &map[string]interface{}{}
-		out := &map[string]interface{}{}
-		if render, ok := ctrl.Handle(w, r, in, out); ok {
-			render(func() (*map[string]interface{}, error) {
-
-				return in, nil
-			}())
+		input := &map[string]interface{}{}
+		if render, ok := ctrl.Handle(w, r, input); ok {
+			render(svc.Echo(r.Context(), *input))
 		}
 	})
 

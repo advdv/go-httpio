@@ -2,3 +2,7 @@ ignored = [
   "github.com/advanderveer/go-httpio",
   "github.com/advanderveer/go-httpio/encoding",
 ]
+
+[[constraint]]
+  name = "github.com/roobre/gorilla-mux"
+  revision = "69e494abae330c166d0494b04e340cc832f9b05e"

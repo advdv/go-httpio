@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/advanderveer/go-httpio/encoding"
-	"github.com/advanderveer/go-httpio/errbox"
 	"github.com/advanderveer/go-httpio/handling"
 )
 
@@ -32,16 +31,19 @@ func (e ClientErr) StatusCode() int { return http.StatusBadRequest }
 //Handle will parse request 'r' into input 'in' and bind 'out' to be render func 'f' is called. If
 //valid is false the error is already rendered onto 'w', no further attempt at rendering should be
 //done at this point.
-func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in, out interface{}) (f RenderFunc, valid bool) {
+func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool) {
 	err := c.H.Parse(r, in)
 	if err != nil {
-		out, _ = errbox.Box(out, ClientErr{err})
-		c.H.MustRender(r.Header, w, out)
+		c.H.MustRender(r.Header, w, ClientErr{err})
 		return nil, false
 	}
 
 	return func(out interface{}, err error) {
-		out, _ = errbox.Box(out, err)
+		if err != nil {
+			c.H.MustRender(r.Header, w, err)
+			return
+		}
+
 		c.H.MustRender(r.Header, w, out)
 	}, true
 }
