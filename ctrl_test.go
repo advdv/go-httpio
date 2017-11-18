@@ -14,7 +14,6 @@ import (
 	httpio "github.com/advanderveer/go-httpio"
 	"github.com/advanderveer/go-httpio/encoding"
 	"github.com/gorilla/schema"
-	validator "gopkg.in/go-playground/validator.v9"
 )
 
 type testInput struct {
@@ -28,14 +27,6 @@ type testOutput struct {
 
 func testImpl(ctx context.Context, in *testInput) (*testOutput, error) {
 	return &testOutput{}, nil
-}
-
-type val struct {
-	v *validator.Validate
-}
-
-func (val *val) Validate(v interface{}) error {
-	return val.v.Struct(v)
 }
 
 func TestClientUsage(t *testing.T) {
@@ -57,7 +48,7 @@ func TestClientUsage(t *testing.T) {
 			Output:    &testOutput{},
 			ExpOutput: &testOutput{},
 			Path:      "",
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return nil, nil
 			},
@@ -69,7 +60,7 @@ func TestClientUsage(t *testing.T) {
 			ExpOutput: &testOutput{},
 			ExpErr:    errors.New("foo"),
 			Path:      "",
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return nil, errors.New("foo")
 			},
@@ -120,7 +111,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "",
 			Body:      nil,
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
 			ExpBody:   `{}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -133,7 +124,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "",
 			Body:      nil,
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
 			ExpBody:   `null` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -147,7 +138,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "",
 			Body:      nil,
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
 			ExpBody:   `{"message":"foo"}` + "\n",
 			ExpStatus: http.StatusInternalServerError,
 			ExpHdr: http.Header{
@@ -164,7 +155,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Path:      "?form-name=bar",
 			Hdr:       http.Header{"Content-Type": []string{"application/json"}},
 			Body:      strings.NewReader(`{"position": "director"}`),
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
 			ExpBody:   `{"result":"bardirector"}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -178,27 +169,10 @@ func TestUsageWithoutClient(t *testing.T) {
 			Path:      "?form-name=bar",
 			Hdr:       http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}},
 			Body:      strings.NewReader("position=director"),
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
 			ExpBody:   `{"result":"bardirector"}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
-				return &testOutput{Result: in.Name + in.Position}, nil
-			},
-		},
-		{
-			Name:      "POST with query and json body that doesnt pass validation",
-			Method:    http.MethodPost,
-			Path:      "?form-name=bíar",
-			Hdr:       http.Header{"Content-Type": []string{"application/json"}},
-			Body:      strings.NewReader(`{"position": "director"}`),
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
-			ExpBody:   `{"message":"Key: 'testInput.Name' Error:Field validation for 'Name' failed on the 'ascii' tag"}` + "\n",
-			ExpStatus: http.StatusBadRequest,
-			ExpHdr: http.Header{
-				"Content-Type":         []string{"application/json; charset=utf-8"},
-				"X-Has-Handling-Error": []string{"1"},
-			},
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return &testOutput{Result: in.Name + in.Position}, nil
 			},
@@ -209,7 +183,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Path:      "?form-name=bíar",
 			Hdr:       http.Header{"Content-Type": []string{"application/json"}},
 			Body:      strings.NewReader(`{"position": "director}`),
-			Ctrl:      httpio.NewCtrl(&val{validator.New()}, &encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+			Ctrl:      httpio.NewCtrl(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
 			ExpBody:   `{"message":"unexpected EOF"}` + "\n",
 			ExpStatus: http.StatusBadRequest,
 			ExpHdr: http.Header{

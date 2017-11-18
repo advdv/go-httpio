@@ -1,0 +1,4 @@
+ignored = [
+  "github.com/advanderveer/go-httpio",
+  "github.com/advanderveer/go-httpio/encoding",
+]
