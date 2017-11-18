@@ -1,30 +1,54 @@
 package handling_test
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/advanderveer/go-httpio/encoding"
 	"github.com/advanderveer/go-httpio/handling"
 )
 
+type renderMyselfFail string
+
+func (r renderMyselfFail) Render(hdr http.Header, w http.ResponseWriter) error {
+	return errors.New("my rendering error")
+}
+
 type renderMyself string
 
 func (r renderMyself) Render(hdr http.Header, w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "foo/bar")
+	w.WriteHeader(900)
 	fmt.Fprintf(w, "hello, %s: %v", r, hdr)
+
 	return nil
 }
+
+type renderStatus struct{}
+
+func (r *renderStatus) StatusCode() int { return 1000 }
+
+type notFoundErr string
+
+func (r notFoundErr) Error() string { return string(r) }
+
+func (r notFoundErr) StatusCode() int { return http.StatusNotFound }
 
 func TestRender(t *testing.T) {
 	for _, c := range []struct {
 		Name       string
+		Must       bool
 		Handling   *handling.H
 		Hdr        http.Header
 		Value      interface{}
 		ExpContent string
+		ExpHdr     http.Header
 		ExpError   error
+		ExpStatus  int
 	}{
 		{
 			Name: "json rendering of nil",
@@ -34,7 +58,9 @@ func TestRender(t *testing.T) {
 			Hdr:        http.Header{"Content-Type": []string{}},
 			Value:      nil,
 			ExpContent: `null` + "\n",
+			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			ExpError:   nil,
+			ExpStatus:  200,
 		},
 		{
 			Name: "custom rendering on type",
@@ -44,15 +70,78 @@ func TestRender(t *testing.T) {
 			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
 			Value:      renderMyself("world"),
 			ExpContent: `hello, world: map[Content-Type:[application/json]]`,
+			ExpHdr:     http.Header{"Content-Type": []string{"foo/bar"}},
 			ExpError:   nil,
+			ExpStatus:  900,
+		},
+		{
+			Name: "custom status on type",
+			Handling: handling.NewH(encoding.NewStack(
+				&encoding.JSON{},
+			)),
+			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
+			Value:      &renderStatus{},
+			ExpContent: `{}` + "\n",
+			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpError:   nil,
+			ExpStatus:  1000,
+		},
+		{
+			Name: "render generic error",
+			Handling: handling.NewH(encoding.NewStack(
+				&encoding.JSON{},
+			)),
+			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
+			Value:      errors.New("foo"),
+			ExpContent: `{"message":"foo"}` + "\n",
+			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpError:   nil,
+			ExpStatus:  http.StatusInternalServerError,
+		},
+		{
+			Name: "render custom error",
+			Handling: handling.NewH(encoding.NewStack(
+				&encoding.JSON{},
+			)),
+			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
+			Value:      notFoundErr("not found"),
+			ExpContent: `{"message":"not found"}` + "\n",
+			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpError:   nil,
+			ExpStatus:  http.StatusNotFound,
+		},
+		{
+			Name: "custom rendering that fails on type",
+			Must: true,
+			Handling: handling.NewH(encoding.NewStack(
+				&encoding.JSON{},
+			)),
+			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
+			Value:      renderMyselfFail("world"),
+			ExpContent: `{"message":"my rendering error"}` + "\n",
+			ExpHdr:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			ExpError:   nil,
+			ExpStatus:  http.StatusInternalServerError,
 		},
 	} {
 		t.Run(c.Name, func(t *testing.T) {
 			hdr := c.Hdr
 			rec := httptest.NewRecorder()
-			err := c.Handling.Render(hdr, rec, c.Value)
-			if err != c.ExpError {
-				t.Fatalf("expected err '%v' to be '%v'", err, c.ExpError)
+			if c.Must {
+				c.Handling.MustRender(hdr, rec, c.Value)
+			} else {
+				err := c.Handling.Render(hdr, rec, c.Value)
+				if err != c.ExpError {
+					t.Fatalf("expected err '%v' to be '%v'", err, c.ExpError)
+				}
+			}
+
+			if rec.Code != c.ExpStatus {
+				t.Fatalf("expected status '%d', got: %d", c.ExpStatus, rec.Code)
+			}
+
+			if !reflect.DeepEqual(rec.Header(), c.ExpHdr) {
+				t.Fatalf("expected resp hdr '%v', got: %v", c.ExpHdr, rec.Header())
 			}
 
 			if rec.Body.String() != c.ExpContent {
@@ -60,5 +149,4 @@ func TestRender(t *testing.T) {
 			}
 		})
 	}
-
 }

@@ -6,16 +6,31 @@ import (
 	"net/http"
 )
 
+//ErrOutput is the struct that is encoded when a generic error
+//value reaches the render method
+type ErrOutput struct {
+	Message string `json:"message" form:"message" schema:"message"`
+}
+
 //Renderable indicates that a type is able to render itself
 type Renderable interface {
 	Render(hdr http.Header, w http.ResponseWriter) error
 }
 
-//MustRender will render 'v' onto 'w' but panics if this fails
+//Statuser allows a type to provide its own status code
+type Statuser interface {
+	StatusCode() int
+}
+
+//MustRender will render 'v' onto 'w' if this fails it will attemp to render the error. If this
+//this fails, it panics
 func (h *H) MustRender(hdr http.Header, w http.ResponseWriter, v interface{}) {
 	err := h.Render(hdr, w, v)
 	if err != nil {
-		panic(fmt.Sprintf("failed to render: %v", err))
+		err = h.Render(hdr, w, err)
+		if err != nil {
+			panic(fmt.Sprintf("failed to render: %v", err))
+		}
 	}
 }
 
@@ -30,6 +45,23 @@ func (h *H) Render(hdr http.Header, w http.ResponseWriter, v interface{}) error 
 		return nil
 	}
 
+	status := -1
+	if statuser, ok := v.(Statuser); ok {
+		status = statuser.StatusCode()
+	}
+
+	if errv, ok := v.(error); ok {
+		if status == -1 {
+			status = http.StatusInternalServerError
+		}
+
+		v = ErrOutput{Message: errv.Error()}
+	}
+
+	if status == -1 {
+		status = http.StatusOK
+	}
+
 	offers := h.encs.Supported()
 	doffer, err := h.encs.Default()
 	if err != nil {
@@ -41,6 +73,9 @@ func (h *H) Render(hdr http.Header, w http.ResponseWriter, v interface{}) error 
 	if e == nil {
 		return errors.New("no suitable encoding found")
 	}
+
+	w.Header().Set("Content-Type", fmt.Sprintf("%s; charset=utf-8", mt))
+	w.WriteHeader(status)
 
 	enc := e.Encoder(w)
 	err = enc.Encode(v)

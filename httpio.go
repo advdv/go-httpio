@@ -20,8 +20,9 @@ type Ctrl struct {
 }
 
 //NewCtrl sets up a controller that handles the provided encoding schemes
-func NewCtrl(def encoding.Encoding, other ...encoding.Encoding) *Ctrl {
+func NewCtrl(val Validator, def encoding.Encoding, other ...encoding.Encoding) *Ctrl {
 	return &Ctrl{
+		V: val,
 		H: handling.NewH(encoding.NewStack(def, other...)),
 	}
 }
