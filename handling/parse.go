@@ -58,6 +58,10 @@ func (h *H) parseContent(r *http.Request, v interface{}) (err error) {
 
 //Parse will atempt to parse the http request 'r' into 'v'
 func (h *H) Parse(r *http.Request, v interface{}) error {
+	if v == nil {
+		return nil //nothing to decode into
+	}
+
 	err := h.parseForm(r, v)
 	if err != nil {
 		return ParseErr{err}

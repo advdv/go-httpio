@@ -130,3 +130,16 @@ func TestDefaultParse(t *testing.T) {
 		})
 	}
 }
+
+func TestParseIntoNil(t *testing.T) {
+	h := handling.NewH(
+		encoding.NewStack(encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+	)
+
+	r, _ := http.NewRequest("GET", "", nil)
+
+	err := h.Parse(r, nil)
+	if err != nil {
+		t.Fatal("parsing into nil should be no-op")
+	}
+}
