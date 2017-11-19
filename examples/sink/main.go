@@ -98,7 +98,7 @@ func main() {
 		if render, ok := ctrl.Handle(w, r, input); ok {
 			render(svc.Echo(r.Context(), input))
 		}
-	})
+	}).Methods("POST")
 
 	r.HandleFunc("/page", func(w http.ResponseWriter, r *http.Request) {
 		input := &myMessage{}
