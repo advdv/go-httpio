@@ -32,16 +32,25 @@ func (c *Ctrl) SetErrorHandler(errh handling.ErrHandler) {
 	c.H.ErrHandler = errh
 }
 
-//Handle will parse request 'r' into input 'in' and bind 'out' to be render func 'f' is called. If
-//valid is false the error is already rendered onto 'w', no further attempt at rendering should be
-//done at this point.
-func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool) {
+//HandleInvalid parses request 'r' into input 'in' and renders when 'f' is called. If valid is false
+//it means ONLY decoding has failed, validation errors needs to be handled by the user and is returned
+//as 'verr'. If valid is false it means the decoding error is already rendered and no futher writing
+//to 'w' should be attempted at this point
+func (c *Ctrl) HandleInvalid(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool, verr error) {
 	err := c.H.Parse(r, in)
 	if err != nil {
+		if verr, ok := err.(handling.ValidationErr); ok {
+			return c.bind(w, r), true, verr //we let the user run its handler with the validation error passed in
+		}
+
 		c.H.MustRender(w, r, err)
-		return nil, false
+		return nil, false, nil
 	}
 
+	return c.bind(w, r), true, nil
+}
+
+func (c *Ctrl) bind(w http.ResponseWriter, r *http.Request) RenderFunc {
 	return func(out interface{}, err error) {
 		if err != nil {
 			c.H.MustRender(w, r, err)
@@ -49,5 +58,18 @@ func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f
 		}
 
 		c.H.MustRender(w, r, out)
-	}, true
+	}
+}
+
+//Handle will parse request 'r' into input 'in' and renders when 'f' is called. If
+//valid is false it means decoding or validation failed the error is instead immediately
+//rendered onto 'w', no further attempt at rendering should be done at this point.
+func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool) {
+	err := c.H.Parse(r, in)
+	if err != nil {
+		c.H.MustRender(w, r, err)
+		return nil, false
+	}
+
+	return c.bind(w, r), true
 }

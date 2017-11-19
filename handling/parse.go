@@ -64,25 +64,25 @@ func (h *H) Parse(r *http.Request, v interface{}) error {
 
 	err := h.parseForm(r, v)
 	if err != nil {
-		return ParseErr{err}
+		return DecodeErr{err}
 	}
 
 	err = h.parseContent(r, v)
 	if err != nil {
-		return ParseErr{err}
+		return DecodeErr{err}
 	}
 
 	if h.Validator != nil {
 		err := h.Validator.Validate(v)
 		if err != nil {
-			return ParseErr{err} //validator for all values bassing by
+			return ValidationErr{err} //validator for all values bassing by
 		}
 	}
 
 	if vv, ok := v.(Validate); ok {
 		err := vv.Validate()
 		if err != nil {
-			return ParseErr{err} //validate specific values
+			return ValidationErr{err} //validate specific values
 		}
 	}
 
