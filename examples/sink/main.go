@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"html/template"
 	"log"
 	"net/http"
 	"strings"
@@ -37,10 +38,27 @@ func (msg *myMessage) Validate() error {
 	return nil
 }
 
+type myPage struct {
+	t *template.Template
+	*myMessage
+}
+
+//implements the renderable interface for custom rendering
+func (p *myPage) Render(r *http.Request, w http.ResponseWriter) error {
+	return p.t.Execute(w, p)
+}
+
 type myService struct{}
 
 func (s *myService) Echo(ctx context.Context, in *myMessage) (*myMessage, error) {
 	return in, nil
+}
+
+func (s *myService) Page(ctx context.Context, in *myMessage) (*myPage, error) {
+	return &myPage{
+		myMessage: in,
+		t:         template.Must(template.New("page").Parse(`hello, {{.A}}` + "\n")),
+	}, nil
 }
 
 type formDecoder struct {
@@ -79,6 +97,13 @@ func main() {
 		input := &myMessage{}
 		if render, ok := ctrl.Handle(w, r, input); ok {
 			render(svc.Echo(r.Context(), input))
+		}
+	})
+
+	r.HandleFunc("/page", func(w http.ResponseWriter, r *http.Request) {
+		input := &myMessage{}
+		if render, ok := ctrl.Handle(w, r, input); ok {
+			render(svc.Page(r.Context(), input))
 		}
 	})
 
