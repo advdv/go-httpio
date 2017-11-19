@@ -32,20 +32,6 @@ func (h *H) parseForm(r *http.Request, v interface{}) error {
 		return err //unsupported types etc
 	}
 
-	if h.Validator != nil {
-		err := h.Validator.Validate(v)
-		if err != nil {
-			return err //validator for all values bassing by
-		}
-	}
-
-	if vv, ok := v.(Validate); ok {
-		err := vv.Validate()
-		if err != nil {
-			return err //validate specific values
-		}
-	}
-
 	return nil
 }
 
@@ -74,12 +60,26 @@ func (h *H) parseContent(r *http.Request, v interface{}) (err error) {
 func (h *H) Parse(r *http.Request, v interface{}) error {
 	err := h.parseForm(r, v)
 	if err != nil {
-		return err
+		return ParseErr{err}
 	}
 
 	err = h.parseContent(r, v)
 	if err != nil {
-		return err
+		return ParseErr{err}
+	}
+
+	if h.Validator != nil {
+		err := h.Validator.Validate(v)
+		if err != nil {
+			return ParseErr{err} //validator for all values bassing by
+		}
+	}
+
+	if vv, ok := v.(Validate); ok {
+		err := vv.Validate()
+		if err != nil {
+			return ParseErr{err} //validate specific values
+		}
 	}
 
 	return nil

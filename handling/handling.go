@@ -7,6 +7,16 @@ import (
 	"github.com/advanderveer/go-httpio/encoding"
 )
 
+//ParseErr is returned during parsing and implements the causer interface which can later
+//be used to find the cause of the error (custom or otherwise)
+type ParseErr struct{ error }
+
+//StatusCode allows parse error to return bad request status
+func (e ParseErr) StatusCode() int { return http.StatusBadRequest }
+
+//Cause is the underlying error of the parsing error
+func (e ParseErr) Cause() error { return e.error }
+
 var (
 	//HeaderHandlingError is set whenever the server knows it has encountered and handling error
 	HeaderHandlingError = "X-Has-Handling-Error"

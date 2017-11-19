@@ -22,11 +22,15 @@ func NewCtrl(def encoding.Encoding, other ...encoding.Encoding) *Ctrl {
 //RenderFunc is bound to an request but renders once called
 type RenderFunc func(interface{}, error)
 
-//ClientErr is used to indicate that the client can fix its input
-type ClientErr struct{ error }
+//SetValidator allows a controller wide validator to be set
+func (c *Ctrl) SetValidator(v handling.Validator) {
+	c.H.Validator = v
+}
 
-//StatusCode allows parse error to return bad request status
-func (e ClientErr) StatusCode() int { return http.StatusBadRequest }
+//SetErrorHandler provides a place to centrally handle implementation errors
+func (c *Ctrl) SetErrorHandler(errh handling.ErrHandler) {
+	c.H.ErrHandler = errh
+}
 
 //Handle will parse request 'r' into input 'in' and bind 'out' to be render func 'f' is called. If
 //valid is false the error is already rendered onto 'w', no further attempt at rendering should be
@@ -34,7 +38,7 @@ func (e ClientErr) StatusCode() int { return http.StatusBadRequest }
 func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool) {
 	err := c.H.Parse(r, in)
 	if err != nil {
-		c.H.MustRender(w, r, ClientErr{err})
+		c.H.MustRender(w, r, err)
 		return nil, false
 	}
 
