@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,6 +35,10 @@ type FormEncoder struct {
 
 //Encode the value v into the encoder writer
 func (e *FormEncoder) Encode(v interface{}) error {
+	if e.enc == nil {
+		return errors.New("no form encoder configured")
+	}
+
 	vals := url.Values{}
 	err := e.enc.Encode(v, vals)
 	if err != nil {
@@ -52,6 +57,10 @@ type FormDecoder struct {
 
 //Decode into v from the reader
 func (e *FormDecoder) Decode(v interface{}) error {
+	if e.dec == nil {
+		return errors.New("no form decoder configured")
+	}
+
 	data, err := ioutil.ReadAll(e.r)
 	if err != nil {
 		return err
