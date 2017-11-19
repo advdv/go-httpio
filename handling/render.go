@@ -8,7 +8,7 @@ import (
 
 //Renderable indicates that a type is able to render itself
 type Renderable interface {
-	Render(hdr http.Header, w http.ResponseWriter) error
+	Render(r *http.Request, w http.ResponseWriter) error
 }
 
 //Statuser allows a type to provide its own status code
@@ -18,10 +18,10 @@ type Statuser interface {
 
 //MustRender will render 'v' onto 'w' if this fails it will attemp to render the error. If this
 //this fails, it panics
-func (h *H) MustRender(hdr http.Header, w http.ResponseWriter, v interface{}) {
-	err := h.Render(hdr, w, v)
+func (h *H) MustRender(w http.ResponseWriter, r *http.Request, v interface{}) {
+	err := h.Render(w, r, v)
 	if err != nil {
-		err = h.Render(hdr, w, err)
+		err = h.Render(w, r, err)
 		if err != nil {
 			panic(fmt.Sprintf("failed to render: %v", err))
 		}
@@ -29,9 +29,13 @@ func (h *H) MustRender(hdr http.Header, w http.ResponseWriter, v interface{}) {
 }
 
 //Render 'v' onto 'w' by takikng into account preferences in 'hdr'
-func (h *H) Render(hdr http.Header, w http.ResponseWriter, v interface{}) error {
+func (h *H) Render(w http.ResponseWriter, r *http.Request, v interface{}) error {
+	if errv, ok := v.(error); ok {
+		v = h.ErrHandler(r.Context(), errv, w.Header())
+	}
+
 	if renderable, ok := v.(Renderable); ok {
-		err := renderable.Render(hdr, w)
+		err := renderable.Render(r, w)
 		if err != nil {
 			return err
 		}
@@ -39,21 +43,10 @@ func (h *H) Render(hdr http.Header, w http.ResponseWriter, v interface{}) error 
 		return nil
 	}
 
-	status := -1
+	var status int
 	if statuser, ok := v.(Statuser); ok {
 		status = statuser.StatusCode()
-	}
-
-	if errv, ok := v.(error); ok {
-		if status == -1 {
-			status = http.StatusInternalServerError
-		}
-
-		w.Header().Set(HeaderHandlingError, "1")
-		v = Err{Message: errv.Error()}
-	}
-
-	if status == -1 {
+	} else {
 		status = http.StatusOK
 	}
 
@@ -63,7 +56,7 @@ func (h *H) Render(hdr http.Header, w http.ResponseWriter, v interface{}) error 
 		return err
 	}
 
-	mt := negotiateContentType(hdr, offers, doffer.MimeType())
+	mt := negotiateContentType(r.Header, offers, doffer.MimeType())
 	e := h.encs.Find(mt)
 	if e == nil {
 		return errors.New("no suitable encoding found")

@@ -14,14 +14,19 @@ import (
 
 //Client is a client that uses encoding stacks to facilitate communication
 type Client struct {
-	client *http.Client
-	base   *url.URL
-	encs   encoding.Stack
+	client      *http.Client
+	base        *url.URL
+	encs        encoding.Stack
+	ErrReceiver handling.ErrReceiver
 }
 
 //NewClient will setup a client that encodes and decodes using the encoding stack
 func NewClient(hclient *http.Client, base string, def encoding.Encoding, other ...encoding.Encoding) (c *Client, err error) {
-	c = &Client{client: hclient, encs: encoding.NewStack(def, other...)}
+	c = &Client{
+		client:      hclient,
+		encs:        encoding.NewStack(def, other...),
+		ErrReceiver: handling.DefaultErrReceiver,
+	}
 	c.base, err = url.Parse(base)
 	if err != nil {
 		return nil, err
@@ -71,14 +76,14 @@ func (c *Client) Request(ctx context.Context, m, p string, hdr http.Header, in, 
 
 	dec := e.Decoder(resp.Body)
 	defer resp.Body.Close()
-	if resp.Header.Get(handling.HeaderHandlingError) != "" {
-		errOut := &handling.Err{} //we will decode into the general Err struct instead
+	errOut := c.ErrReceiver(ctx, resp)
+	if errOut != nil {
 		err = dec.Decode(errOut)
 		if err != nil {
 			return err
 		}
 
-		return errors.New(errOut.Message)
+		return errOut
 	}
 
 	err = dec.Decode(out)

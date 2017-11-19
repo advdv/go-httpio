@@ -34,16 +34,16 @@ func (e ClientErr) StatusCode() int { return http.StatusBadRequest }
 func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool) {
 	err := c.H.Parse(r, in)
 	if err != nil {
-		c.H.MustRender(r.Header, w, ClientErr{err})
+		c.H.MustRender(w, r, ClientErr{err})
 		return nil, false
 	}
 
 	return func(out interface{}, err error) {
 		if err != nil {
-			c.H.MustRender(r.Header, w, err)
+			c.H.MustRender(w, r, err)
 			return
 		}
 
-		c.H.MustRender(r.Header, w, out)
+		c.H.MustRender(w, r, out)
 	}, true
 }

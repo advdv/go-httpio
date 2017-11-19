@@ -9,6 +9,11 @@ import (
 	"github.com/advanderveer/go-httpio/encoding"
 )
 
+//Validate can be implemeted by inputs that can validate themselves
+type Validate interface {
+	Validate() error
+}
+
 func (h *H) parseForm(r *http.Request, v interface{}) error {
 	fenc := h.encs.Find(encoding.MediaTypeForm)
 	if fenc == nil {
@@ -24,7 +29,21 @@ func (h *H) parseForm(r *http.Request, v interface{}) error {
 	dec := fenc.Decoder(q)
 	err = dec.Decode(v)
 	if err != nil {
-		return err //v is a map, certain fields not found etc
+		return err //unsupported types etc
+	}
+
+	if h.Validator != nil {
+		err := h.Validator.Validate(v)
+		if err != nil {
+			return err //validator for all values bassing by
+		}
+	}
+
+	if vv, ok := v.(Validate); ok {
+		err := vv.Validate()
+		if err != nil {
+			return err //validate specific values
+		}
 	}
 
 	return nil

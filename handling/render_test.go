@@ -14,19 +14,23 @@ import (
 
 type renderMyselfFail string
 
-func (r renderMyselfFail) Render(hdr http.Header, w http.ResponseWriter) error {
+func (rmf renderMyselfFail) Render(r *http.Request, w http.ResponseWriter) error {
 	return errors.New("my rendering error")
 }
 
 type renderMyself string
 
-func (r renderMyself) Render(hdr http.Header, w http.ResponseWriter) error {
+func (rmf renderMyself) Render(r *http.Request, w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "foo/bar")
 	w.WriteHeader(900)
-	fmt.Fprintf(w, "hello, %s: %v", r, hdr)
+	fmt.Fprintf(w, "hello, %s: %v", rmf, r.Header)
 
 	return nil
 }
+
+type statusCodeError struct{ error }
+
+func (e statusCodeError) StatusCode() int { return http.StatusBadRequest }
 
 type renderStatus struct{}
 
@@ -107,14 +111,14 @@ func TestRender(t *testing.T) {
 				&encoding.JSON{},
 			)),
 			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
-			Value:      notFoundErr("not found"),
-			ExpContent: `{"message":"not found"}` + "\n",
+			Value:      statusCodeError{errors.New("foo")},
+			ExpContent: `{"message":"foo"}` + "\n",
 			ExpHdr: http.Header{
 				"Content-Type":         []string{"application/json; charset=utf-8"},
 				"X-Has-Handling-Error": []string{"1"},
 			},
 			ExpError:  nil,
-			ExpStatus: http.StatusNotFound,
+			ExpStatus: http.StatusBadRequest,
 		},
 		{
 			Name: "custom rendering that fails on type",
@@ -134,12 +138,14 @@ func TestRender(t *testing.T) {
 		},
 	} {
 		t.Run(c.Name, func(t *testing.T) {
-			hdr := c.Hdr
+			req, _ := http.NewRequest(http.MethodGet, "", nil)
+			req.Header = c.Hdr
+
 			rec := httptest.NewRecorder()
 			if c.Must {
-				c.Handling.MustRender(hdr, rec, c.Value)
+				c.Handling.MustRender(rec, req, c.Value)
 			} else {
-				err := c.Handling.Render(hdr, rec, c.Value)
+				err := c.Handling.Render(rec, req, c.Value)
 				if err != c.ExpError {
 					t.Fatalf("expected err '%v' to be '%v'", err, c.ExpError)
 				}
