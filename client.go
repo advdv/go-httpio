@@ -25,7 +25,7 @@ func NewClient(hclient *http.Client, base string, def encoding.Encoding, other .
 	c = &Client{
 		client:      hclient,
 		encs:        encoding.NewStack(def, other...),
-		ErrReceiver: handling.DefaultErrReceiver,
+		ErrReceiver: handling.HeaderErrReceiver,
 	}
 	c.base, err = url.Parse(base)
 	if err != nil {

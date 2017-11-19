@@ -70,7 +70,7 @@ func main() {
 			err = errors.New(strings.ToUpper(err.Error())) //customize our errors before sending back
 		}
 
-		return handling.DefaultErrHandler(ctx, err, whdr) //call original if we want
+		return handling.HeaderErrHandling(ctx, err, whdr) //call original if we want
 	})
 
 	svc := &myService{} //services implement business logic

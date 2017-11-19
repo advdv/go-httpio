@@ -21,9 +21,10 @@ var (
 	//HeaderHandlingError is set whenever the server knows it has encountered and handling error
 	HeaderHandlingError = "X-Has-Handling-Error"
 
-	//DefaultErrHandler will simply return the generic Err struct for encoding that includes a
-	//statuscode that defaults to 500 unless the input error specifies otherwise
-	DefaultErrHandler = func(ctx context.Context, err error, whdr http.Header) interface{} {
+	//HeaderErrHandling will simply return the generic Err struct for encoding that includes a
+	//statuscode that defaults to 500 unless the input error specifies otherwise, it uses an header
+	//value to signal to the client that the body contains an error.
+	HeaderErrHandling = func(ctx context.Context, err error, whdr http.Header) interface{} {
 		e := &Err{Message: err.Error()}
 		if errs, ok := err.(Statuser); ok {
 			e.status = errs.StatusCode()
@@ -35,9 +36,9 @@ var (
 		return e
 	}
 
-	//DefaultErrReceiver uses the header value to determine if the response holds an error. It should
+	//HeaderErrReceiver uses the header value to determine if the response holds an error. It should
 	//rturn nil if the response contains no error
-	DefaultErrReceiver = func(ctx context.Context, resp *http.Response) error {
+	HeaderErrReceiver = func(ctx context.Context, resp *http.Response) error {
 		if resp.Header.Get(HeaderHandlingError) != "" {
 			errOut := &Err{status: resp.StatusCode} //we will decode into the general Err struct instead
 			return errOut
@@ -86,5 +87,5 @@ type H struct {
 
 //NewH will setup handling using encoding stack 'encs'
 func NewH(encs encoding.Stack) *H {
-	return &H{encs, DefaultErrHandler, nil}
+	return &H{encs, HeaderErrHandling, nil}
 }
