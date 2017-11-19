@@ -72,25 +72,18 @@ log.Fatal(http.ListenAndServe(":8080", r))
 ```
 
 ## Recipes
-A lot can be changed in the behaviour of this library, the documentation for this is still work in
-progress. Let me know what you would like to see first:
+Although the library designed to be flexible and serve different needs for
+different web applications. Much of these are still need to written but you
+can take a look at the `examples/sink` code for most of it.
 
-### Using `*template.Templates` to render Outputs
-
-### Adding custom validation to Inputs
-
-### Using the `github.com/go-playground/validator` validator
-
-### Allow inputs to be decoded from from submissions and query parameters
-
-### Handle certain (user) errors differently
-
-### Customize response status code
-
-### Disable the 'X-Has-Handling-Error' header
-
-### Using the client with application specific errors
-
+- Using `*template.Templates` to render Outputs: WIP
+- Adding custom validation to Inputs: WIP
+- Using the `github.com/go-playground/validator` validator: WIP
+- Allow inputs to be decoded from from submissions and query parameters: WIP
+- Handle certain (user) errors differently: WIP
+- Customize response status code: WIP
+- Disable the 'X-Has-Handling-Error' header: WIP
+- Using the client with application specific errors: WIP
 
 ## Future Ideas
 Another part that can be cumbersome in setting up for your business logic is fetching values from
