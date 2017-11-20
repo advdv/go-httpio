@@ -86,6 +86,8 @@ can take a look at the `examples/sink` code for most of it.
 - Using the client with application specific errors: WIP
 
 ## Future Ideas
+
+### Adding ctx values to implementation inputs
 Another part that can be cumbersome in setting up for your business logic is fetching values from
 the request context that are set by certain middleware, e.g: session, request ids etc. It would be
 cool if the struct tags of input could indicate that their value should be fetched from the request
@@ -100,3 +102,7 @@ type MyInput {
 _httpio_ then would take care of injecting these into the input struct before handing it off to the
 business logic. Main problem is that it is recommended to use package specific type values for context
 keys, so a annotation as the one above would not be possible. If you have any ideas for this let me know.
+
+### Adding header values to the implementation input
+Similarly some implementation functions might want to retrieve a specific header. Middleware would allow
+this for a set of endpoints but sometimes the client might send over a specific header.

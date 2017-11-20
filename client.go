@@ -36,7 +36,8 @@ func NewClient(hclient *http.Client, base string, def encoding.Encoding, other .
 }
 
 //Request output 'out' using method 'm' on path 'p' using headers 'hdr' and input 'in' encoded as
-//the default encodinbg scheme from the stack
+//the default encodinbg scheme from the stack. The "Content-Type" header will be set regardless of
+//what is provided as an argument
 func (c *Client) Request(ctx context.Context, m, p string, hdr http.Header, in, out interface{}) (err error) {
 	def, err := c.encs.Default()
 	if err != nil {
@@ -58,6 +59,10 @@ func (c *Client) Request(ctx context.Context, m, p string, hdr http.Header, in, 
 	req, err := http.NewRequest(m, c.base.ResolveReference(ref).String(), body)
 	if err != nil {
 		return err
+	}
+
+	if hdr != nil {
+		req.Header = hdr //@TODO test this once the library allows the server impl to retrieve certain header values
 	}
 
 	req = req.WithContext(ctx)
