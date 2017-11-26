@@ -33,15 +33,15 @@ func (i *testInput) Validate() error {
 
 func TestDefaultParse(t *testing.T) {
 	for _, c := range []struct {
-		Name      string
-		Handling  *handling.H
-		Validator handling.Validator
-		Method    string
-		Path      string
-		Body      string
-		Headers   http.Header
-		ExpInput  *testInput //we expect the body to be parsed into the input like this
-		ExpErr    error
+		Name     string
+		Handling *handling.H
+		// Validator handling.Validator
+		Method   string
+		Path     string
+		Body     string
+		Headers  http.Header
+		ExpInput *testInput //we expect the body to be parsed into the input like this
+		ExpErr   error
 	}{
 		{
 			Name: "plain GET should not decode as it has no content",
@@ -70,27 +70,6 @@ func TestDefaultParse(t *testing.T) {
 			ExpInput: &testInput{Name: "foo", Image: "bar"},
 		},
 		{
-			Name: "GET with query and custom validator should fail",
-			Handling: handling.NewH(
-				encoding.NewStack(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
-			),
-			Method:   http.MethodGet,
-			Path:     "?name=foo&form-image=invalid",
-			ExpInput: &testInput{Name: "foo", Image: "invalid"},
-			ExpErr:   errors.New("invalid image"),
-		},
-		{
-			Name: "GET with query and handler validator should fail",
-			Handling: handling.NewH(
-				encoding.NewStack(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
-			),
-			Method:    http.MethodGet,
-			Validator: val{validate.New()},
-			Path:      "?name=foo&form-image=my-iímg",
-			ExpInput:  &testInput{Name: "foo", Image: "my-iímg"},
-			ExpErr:    errors.New("Key: 'testInput.Image' Error:Field validation for 'Image' failed on the 'ascii' tag"),
-		},
-		{
 			Name: "POST with json should overwrite image but not name",
 			Handling: handling.NewH(
 				encoding.NewStack(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
@@ -111,10 +90,6 @@ func TestDefaultParse(t *testing.T) {
 			r, err := http.NewRequest(c.Method, c.Path, b)
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
-			}
-
-			if c.Validator != nil {
-				c.Handling.Validator = c.Validator
 			}
 
 			r.Header = c.Headers

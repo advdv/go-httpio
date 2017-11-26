@@ -14,7 +14,6 @@ import (
 	"github.com/advanderveer/go-httpio/handling"
 	"github.com/monoculum/formam"
 	"github.com/roobre/gorilla-mux"
-	validate "gopkg.in/go-playground/validator.v9"
 )
 
 type myInvalidErr interface {
@@ -69,10 +68,6 @@ func (fd *formDecoder) Decode(dst interface{}, vs map[string][]string) error {
 	return fd.Decoder.Decode(vs, dst)
 }
 
-type val struct{ v *validate.Validate }
-
-func (val val) Validate(v interface{}) error { return val.v.Struct(v) }
-
 func main() {
 	r := mux.NewRouter() //route requests to handlers
 
@@ -81,7 +76,6 @@ func main() {
 		encoding.NewFormEncoding(nil, &formDecoder{formam.NewDecoder(nil)}),
 	) //request parsing and response rendering (including errors)
 
-	ctrl.SetValidator(&val{validate.New()}) //include our validation
 	ctrl.SetErrorHandler(func(ctx context.Context, err error, whdr http.Header) interface{} {
 		cause := errors.Cause(err) //parse errors that arrive happen to implement the cause interface
 		if _, ok := cause.(myInvalidErr); ok {

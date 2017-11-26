@@ -7,15 +7,6 @@ import (
 	"github.com/advanderveer/go-httpio/encoding"
 )
 
-//ValidationErr encapulate a validation error
-type ValidationErr struct{ error }
-
-//StatusCode allows parse error to return bad request status
-func (e ValidationErr) StatusCode() int { return http.StatusBadRequest }
-
-//Cause is the underlying error of the parsing error
-func (e ValidationErr) Cause() error { return e.error }
-
 //DecodeErr is returned during decoding and implements the causer interface which can later
 //be used to find the cause of the error (custom or otherwise)
 type DecodeErr struct{ error }
@@ -82,19 +73,14 @@ func (e Err) Error() string { return e.Message }
 //StatusCode sets the status that is used whenever the error is encoded
 func (e Err) StatusCode() int { return e.status }
 
-//Validator provides validation just after decoding
-type Validator interface {
-	Validate(v interface{}) error
-}
-
 //H allows http request parsing and output writing using encoding stacks
 type H struct {
 	encs       encoding.Stack
 	ErrHandler ErrHandler
-	Validator  Validator
+	// Validator  Validator
 }
 
 //NewH will setup handling using encoding stack 'encs'
 func NewH(encs encoding.Stack) *H {
-	return &H{encs, HeaderErrHandling, nil}
+	return &H{encs, HeaderErrHandling}
 }

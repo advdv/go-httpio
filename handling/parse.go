@@ -72,19 +72,5 @@ func (h *H) Parse(r *http.Request, v interface{}) error {
 		return DecodeErr{err}
 	}
 
-	if h.Validator != nil {
-		err := h.Validator.Validate(v)
-		if err != nil {
-			return ValidationErr{err} //validator for all values bassing by
-		}
-	}
-
-	if vv, ok := v.(Validate); ok {
-		err := vv.Validate()
-		if err != nil {
-			return ValidationErr{err} //validate specific values
-		}
-	}
-
 	return nil
 }

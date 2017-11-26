@@ -43,7 +43,7 @@ func (ctrl *MyAccountCtrl) CreateAccount(ctx context.Context, input *CreateAccou
 }
 ```
 
-Instead of having to write your own decoding, validation and encoding logic for each input or output struct this library
+Instead of having to write your own decoding and encoding logic for each input or output struct this library
 simply allows you do the following:
 
 ```Go
@@ -58,8 +58,7 @@ ctrl.SetValidator(/* choose an validator from the eco system */)
 ctrl.SetErrorHandler(/* allow error handling to be customized */)
 
 //and voila, your request handlers can now look like this. Notice you don't have to write any
-//logic for decoding the CreateAccountInput or encoding its output. Validation is also done
-//before the input is passed to the implementation.
+//logic for decoding the CreateAccountInput or encoding its output.
 r.HandleFunc("/accounts/create", func(w http.ResponseWriter, r *http.Request) {
   input := &CreateAccountInput{}
   if render, ok := ctrl.Handle(w, r, input); ok {
@@ -77,7 +76,6 @@ different web applications. Much of these are still need to written but you
 can take a look at the `examples/sink` code for most of it.
 
 - Using `*template.Templates` to render Outputs: WIP
-- Adding custom validation to Inputs: WIP
 - Using the `github.com/go-playground/validator` validator: WIP
 - Allow inputs to be decoded from from submissions and query parameters: WIP
 - Handle certain (user) errors differently: WIP
