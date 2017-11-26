@@ -60,6 +60,12 @@ type ErrHandler func(ctx context.Context, err error, whdr http.Header) interface
 //struct to decode it into. If the reponse holds an error this function should return a non-nil value
 type ErrReceiver func(ctx context.Context, resp *http.Response) error
 
+//EncodingDelegate is called just before the encoding and allows the user to do common operations on
+//the object that is about to be serialized
+type EncodingDelegate interface {
+	PreRender(v interface{}, r *http.Request) (interface{}, error)
+}
+
 //Err is the struct that is encoded when a generic error
 //value reaches the render method
 type Err struct {
@@ -75,12 +81,12 @@ func (e Err) StatusCode() int { return e.status }
 
 //H allows http request parsing and output writing using encoding stacks
 type H struct {
-	encs       encoding.Stack
-	ErrHandler ErrHandler
-	// Validator  Validator
+	encs             encoding.Stack
+	ErrHandler       ErrHandler
+	EncodingDelegate EncodingDelegate
 }
 
 //NewH will setup handling using encoding stack 'encs'
 func NewH(encs encoding.Stack) *H {
-	return &H{encs, HeaderErrHandling}
+	return &H{encs, HeaderErrHandling, nil}
 }

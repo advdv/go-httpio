@@ -27,6 +27,11 @@ func (c *Ctrl) SetErrorHandler(errh handling.ErrHandler) {
 	c.H.ErrHandler = errh
 }
 
+//SetEncodingDelegate allows for abstracting common patterns for a response
+func (c *Ctrl) SetEncodingDelegate(d handling.EncodingDelegate) {
+	c.H.EncodingDelegate = d
+}
+
 func (c *Ctrl) bind(w http.ResponseWriter, r *http.Request) RenderFunc {
 	return func(out interface{}, err error) {
 		if err != nil {

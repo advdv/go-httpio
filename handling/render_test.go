@@ -28,6 +28,12 @@ func (rmf renderMyself) Render(r *http.Request, w http.ResponseWriter) error {
 	return nil
 }
 
+type overwriteDelegate func(v interface{}, r *http.Request) (interface{}, error)
+
+func (f overwriteDelegate) PreRender(v interface{}, r *http.Request) (interface{}, error) {
+	return f(v, r)
+}
+
 type statusCodeError struct{ error }
 
 func (e statusCodeError) StatusCode() int { return http.StatusBadRequest }
@@ -44,15 +50,16 @@ func (r notFoundErr) StatusCode() int { return http.StatusNotFound }
 
 func TestRender(t *testing.T) {
 	for _, c := range []struct {
-		Name       string
-		Must       bool
-		Handling   *handling.H
-		Hdr        http.Header
-		Value      interface{}
-		ExpContent string
-		ExpHdr     http.Header
-		ExpError   error
-		ExpStatus  int
+		Name        string
+		Must        bool
+		Handling    *handling.H
+		Hdr         http.Header
+		Value       interface{}
+		ExpContent  string
+		EncDelegate handling.EncodingDelegate
+		ExpHdr      http.Header
+		ExpError    error
+		ExpStatus   int
 	}{
 		{
 			Name: "json rendering of nil",
@@ -74,6 +81,25 @@ func TestRender(t *testing.T) {
 			Hdr:        http.Header{"Content-Type": []string{"application/json"}},
 			Value:      renderMyself("world"),
 			ExpContent: `hello, world: map[Content-Type:[application/json]]`,
+			ExpHdr:     http.Header{"Content-Type": []string{"foo/bar"}},
+			ExpError:   nil,
+			ExpStatus:  900,
+		},
+		{
+			Name: "custom rendering on type with encoding delegate",
+			Handling: handling.NewH(encoding.NewStack(
+				&encoding.JSON{},
+			)),
+			Hdr:   http.Header{"Content-Type": []string{"application/json"}},
+			Value: renderMyself("world"),
+			EncDelegate: overwriteDelegate(func(v interface{}, r *http.Request) (interface{}, error) {
+				if _, ok := v.(renderMyself); ok {
+					return renderMyself("overwritten"), nil
+				}
+
+				return v, nil
+			}),
+			ExpContent: `hello, overwritten: map[Content-Type:[application/json]]`,
 			ExpHdr:     http.Header{"Content-Type": []string{"foo/bar"}},
 			ExpError:   nil,
 			ExpStatus:  900,
@@ -140,6 +166,10 @@ func TestRender(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			req, _ := http.NewRequest(http.MethodGet, "", nil)
 			req.Header = c.Hdr
+
+			if c.EncDelegate != nil {
+				c.Handling.EncodingDelegate = c.EncDelegate
+			}
 
 			rec := httptest.NewRecorder()
 			if c.Must {

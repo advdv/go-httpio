@@ -29,13 +29,20 @@ func (h *H) MustRender(w http.ResponseWriter, r *http.Request, v interface{}) {
 }
 
 //Render 'v' onto 'w' by takikng into account preferences in 'hdr'
-func (h *H) Render(w http.ResponseWriter, r *http.Request, v interface{}) error {
+func (h *H) Render(w http.ResponseWriter, r *http.Request, v interface{}) (err error) {
 	if errv, ok := v.(error); ok {
 		v = h.ErrHandler(r.Context(), errv, w.Header())
 	}
 
+	if h.EncodingDelegate != nil {
+		v, err = h.EncodingDelegate.PreRender(v, r)
+		if err != nil {
+			return errors.New("encode delegation failed")
+		}
+	}
+
 	if renderable, ok := v.(Renderable); ok {
-		err := renderable.Render(r, w)
+		err = renderable.Render(r, w)
 		if err != nil {
 			return err
 		}
