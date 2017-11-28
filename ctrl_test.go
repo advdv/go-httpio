@@ -13,6 +13,7 @@ import (
 
 	httpio "github.com/advanderveer/go-httpio"
 	"github.com/advanderveer/go-httpio/encoding"
+	"github.com/advanderveer/go-httpio/encoding/middleware"
 	"github.com/gorilla/schema"
 )
 
@@ -38,13 +39,57 @@ type testOutput struct {
 	Result string `json:"result,omitempty"`
 }
 
+var stdQueryWare = func(next middleware.Transformer) middleware.Transformer {
+	return middleware.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
+		vals := r.URL.Query()
+		if len(vals) > 0 {
+			dec := schema.NewDecoder()
+			err := dec.Decode(a, vals)
+			if err != nil {
+				return err
+			}
+		}
+
+		return next.Transform(a, r, w)
+	})
+}
+
+var stdErrWare = func(next middleware.Transformer) middleware.Transformer {
+	return middleware.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
+		if err, ok := a.(error); ok {
+			a = struct {
+				Message string `json:"message"` //give the error response shape
+			}{err.Error()}
+
+			w.Header().Set("X-Has-Handling-Error", "1")
+			errStatus := http.StatusInternalServerError
+			if middleware.IsDecodeErr(err) {
+				errStatus = http.StatusBadRequest
+			}
+
+			return next.Transform(a, r.WithContext(middleware.WithStatus(r.Context(), errStatus)), w) //set a status code
+		}
+
+		return next.Transform(a, r, w)
+	})
+}
+
+func newStdIO() *middleware.Ingress {
+	j := &middleware.JSON{}
+	egress := middleware.NewEgress(j)
+	egress.Use(stdErrWare)
+	ingress := middleware.NewIngress(egress, j, middleware.NewFormDecoding(schema.NewDecoder()))
+	ingress.Use(stdQueryWare)
+	return ingress
+}
+
 func TestClientUsage(t *testing.T) {
 	for _, c := range []struct {
 		Name      string
 		Method    string
 		Path      string
 		Hdr       http.Header
-		Ctrl      *httpio.Ctrl
+		Ingress   *middleware.Ingress
 		Input     *testInput
 		Output    *testOutput
 		ExpErr    error
@@ -57,7 +102,7 @@ func TestClientUsage(t *testing.T) {
 			Output:    &testOutput{},
 			ExpOutput: &testOutput{},
 			Path:      "",
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
+			Ingress:   newStdIO(),
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return nil, nil
 			},
@@ -69,7 +114,7 @@ func TestClientUsage(t *testing.T) {
 			ExpOutput: &testOutput{},
 			ExpErr:    errors.New("foo"),
 			Path:      "",
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
+			Ingress:   newStdIO(),
 			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
 				return nil, errors.New("foo")
 			},
@@ -78,7 +123,7 @@ func TestClientUsage(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				in := &testInput{}
-				if render, valid := c.Ctrl.Handle(w, r, in); valid {
+				if render, valid := c.Ingress.Handle(w, r, in); valid {
 					render(c.Impl(r.Context(), in))
 				}
 			}))
@@ -97,7 +142,6 @@ func TestClientUsage(t *testing.T) {
 			if !reflect.DeepEqual(c.Output, c.ExpOutput) {
 				t.Fatalf("expected output '%v', got: %v", c.ExpOutput, c.Output)
 			}
-
 		})
 	}
 }
@@ -109,7 +153,7 @@ func TestUsageWithoutClient(t *testing.T) {
 		Path      string
 		Hdr       http.Header
 		Body      io.Reader
-		Ctrl      *httpio.Ctrl
+		Ingress   *middleware.Ingress
 		Impl      func(context.Context, *testInput) (*testOutput, error)
 		ExpBody   string
 		ExpStatus int
@@ -120,7 +164,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "",
 			Body:      nil,
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
+			Ingress:   newStdIO(),
 			ExpBody:   `{}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -133,7 +177,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "",
 			Body:      nil,
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
+			Ingress:   newStdIO(),
 			ExpBody:   `null` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -141,13 +185,12 @@ func TestUsageWithoutClient(t *testing.T) {
 				return nil, nil
 			},
 		},
-
 		{
 			Name:      "GET return nil and error",
 			Method:    http.MethodGet,
 			Path:      "",
 			Body:      nil,
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}),
+			Ingress:   newStdIO(),
 			ExpBody:   `{"message":"foo"}` + "\n",
 			ExpStatus: http.StatusInternalServerError,
 			ExpHdr: http.Header{
@@ -164,7 +207,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Path:      "?form-name=bar",
 			Hdr:       http.Header{"Content-Type": []string{"application/json"}},
 			Body:      strings.NewReader(`{"position": "director"}`),
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+			Ingress:   newStdIO(),
 			ExpBody:   `{"result":"bardirector"}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -178,7 +221,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Path:      "?form-name=bar",
 			Hdr:       http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}},
 			Body:      strings.NewReader("position=director"),
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+			Ingress:   newStdIO(),
 			ExpBody:   `{"result":"bardirector"}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
@@ -192,7 +235,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			Path:      "?form-name=bíar",
 			Hdr:       http.Header{"Content-Type": []string{"application/json"}},
 			Body:      strings.NewReader(`{"position": "director}`),
-			Ctrl:      httpio.NewCtrl(&encoding.JSON{}, encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
+			Ingress:   newStdIO(),
 			ExpBody:   `{"message":"unexpected EOF"}` + "\n",
 			ExpStatus: http.StatusBadRequest,
 			ExpHdr: http.Header{
@@ -210,7 +253,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			r.Header = c.Hdr
 			func(w http.ResponseWriter, r *http.Request) {
 				in := &testInput{}
-				if render, valid := c.Ctrl.Handle(w, r, in); valid {
+				if render, valid := c.Ingress.Handle(w, r, in); valid {
 					render(c.Impl(r.Context(), in))
 				}
 			}(w, r)

@@ -3,7 +3,7 @@ package httpio
 import (
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"mime"
 	"net/http"
 	"net/url"
@@ -76,7 +76,7 @@ func (c *Client) Request(ctx context.Context, m, p string, hdr http.Header, in, 
 	mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	e := c.encs.Find(mt)
 	if e == nil {
-		return errors.New("unspported content type")
+		return fmt.Errorf("httpio/client: no encoder for mediate type '%s'", mt)
 	}
 
 	dec := e.Decoder(resp.Body)

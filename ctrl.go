@@ -44,7 +44,7 @@ func (c *Ctrl) bind(w http.ResponseWriter, r *http.Request) RenderFunc {
 }
 
 //Handle will parse request 'r' into input 'in' and renders when 'f' is called. If
-//valid is false it means decoding or validation failed the error is instead immediately
+//valid is false it means decoding  failed the error is instead immediately
 //rendered onto 'w', no further attempt at rendering should be done at this point.
 func (c *Ctrl) Handle(w http.ResponseWriter, r *http.Request, in interface{}) (f RenderFunc, valid bool) {
 	err := c.H.Parse(r, in)
