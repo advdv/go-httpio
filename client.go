@@ -7,25 +7,48 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-
-	"github.com/advanderveer/go-httpio/encoding"
-	"github.com/advanderveer/go-httpio/handling"
 )
+
+//ErrReceiver is used by the client to determine if the response holds an error value and specify the
+//struct to decode it into. If the reponse holds an error this function should return a non-nil value
+type ErrReceiver func(ctx context.Context, resp *http.Response) error
 
 //Client is a client that uses encoding stacks to facilitate communication
 type Client struct {
-	client      *http.Client
-	base        *url.URL
-	encs        encoding.Stack
-	ErrReceiver handling.ErrReceiver
+	client *http.Client
+	base   *url.URL
+	encs   EncoderList
+	decs   DecoderList
+
+	ErrReceiver ErrReceiver
 }
 
+type stdClientErr struct {
+	Message string `json:"message"`
+}
+
+func (e *stdClientErr) Error() string { return e.Message }
+
 //NewClient will setup a client that encodes and decodes using the encoding stack
-func NewClient(hclient *http.Client, base string, def encoding.Encoding, other ...encoding.Encoding) (c *Client, err error) {
+func NewClient(hclient *http.Client, base string, def EncoderFactory, defd DecoderFactory, others ...DecoderFactory) (c *Client, err error) {
+	encs := EncoderList{def}
+	decs := DecoderList{defd}
+	decs = append(decs, others...)
+
 	c = &Client{
-		client:      hclient,
-		encs:        encoding.NewStack(def, other...),
-		ErrReceiver: handling.HeaderErrReceiver,
+		client: hclient,
+		encs:   encs,
+		decs:   decs,
+
+		//@TODO move this to some Std implementation
+		ErrReceiver: func(ctx context.Context, resp *http.Response) error {
+			if resp.Header.Get("X-Has-Handling-Error") != "" {
+				errOut := &stdClientErr{} //we will decode into the general Err struct instead
+				return errOut
+			}
+
+			return nil
+		},
 	}
 	c.base, err = url.Parse(base)
 	if err != nil {
@@ -39,10 +62,7 @@ func NewClient(hclient *http.Client, base string, def encoding.Encoding, other .
 //the default encodinbg scheme from the stack. The "Content-Type" header will be set regardless of
 //what is provided as an argument
 func (c *Client) Request(ctx context.Context, m, p string, hdr http.Header, in, out interface{}) (err error) {
-	def, err := c.encs.Default()
-	if err != nil {
-		return err
-	}
+	def := c.encs.Default()
 
 	body := bytes.NewBuffer(nil)
 	enc := def.Encoder(body)
@@ -74,12 +94,12 @@ func (c *Client) Request(ctx context.Context, m, p string, hdr http.Header, in, 
 	}
 
 	mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	e := c.encs.Find(mt)
-	if e == nil {
-		return fmt.Errorf("httpio/client: no encoder for mediate type '%s'", mt)
+	decf := c.decs.Find(mt)
+	if decf == nil {
+		return fmt.Errorf("httpio/client: no encoder for media type '%s'", mt)
 	}
 
-	dec := e.Decoder(resp.Body)
+	dec := decf.Decoder(resp.Body)
 	defer resp.Body.Close()
 	errOut := c.ErrReceiver(ctx, resp)
 	if errOut != nil {

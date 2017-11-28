@@ -1,37 +1,37 @@
-package middleware_test
+package httpio_test
 
 import (
 	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/advanderveer/go-httpio/encoding/middleware"
+	httpio "github.com/advanderveer/go-httpio"
 	"github.com/gorilla/schema"
 )
 
 func TestEncodingStd(t *testing.T) {
-	var ef middleware.EncoderFactory
-	ef = &middleware.JSON{}
+	var ef httpio.EncoderFactory
+	ef = &httpio.JSON{}
 	if ef.MimeType() != "application/json" {
 		t.Fatal("should be application json")
 	}
 
-	var df middleware.DecoderFactory
-	df = &middleware.XML{}
+	var df httpio.DecoderFactory
+	df = &httpio.XML{}
 	if df.MimeType() != "application/xml" {
 		t.Fatal("should be application xml")
 	}
 }
 
 func TestEncodingForm(t *testing.T) {
-	var ef middleware.EncoderFactory
-	ef = middleware.NewFormEncoding(schema.NewEncoder())
+	var ef httpio.EncoderFactory
+	ef = httpio.NewFormEncoding(schema.NewEncoder())
 	if ef.MimeType() != "application/x-www-form-urlencoded" {
 		t.Fatal("mime type should be application/x-www-form-urlencoded")
 	}
 
-	var df middleware.DecoderFactory
-	df = middleware.NewFormDecoding(schema.NewDecoder())
+	var df httpio.DecoderFactory
+	df = httpio.NewFormDecoding(schema.NewDecoder())
 	if df.MimeType() != "application/x-www-form-urlencoded" {
 		t.Fatal("mime type should be application/x-www-form-urlencoded")
 	}
@@ -72,8 +72,8 @@ func TestEncodingForm(t *testing.T) {
 }
 
 func TestEncodingFormNoEncoder(t *testing.T) {
-	var e middleware.EncoderFactory
-	e = middleware.NewFormEncoding(nil)
+	var e httpio.EncoderFactory
+	e = httpio.NewFormEncoding(nil)
 	if e.MimeType() != "application/x-www-form-urlencoded" {
 		t.Fatal("mime type should be application/x-www-form-urlencoded")
 	}
@@ -93,8 +93,8 @@ func TestEncodingFormNoEncoder(t *testing.T) {
 }
 
 func TestEncodingFormNoDecoder(t *testing.T) {
-	var e middleware.DecoderFactory
-	e = middleware.NewFormDecoding(nil)
+	var e httpio.DecoderFactory
+	e = httpio.NewFormDecoding(nil)
 	if e.MimeType() != "application/x-www-form-urlencoded" {
 		t.Fatal("mime type should be application/x-www-form-urlencoded")
 	}

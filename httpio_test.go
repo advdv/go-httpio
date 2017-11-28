@@ -12,8 +12,6 @@ import (
 	"testing"
 
 	httpio "github.com/advanderveer/go-httpio"
-	"github.com/advanderveer/go-httpio/encoding"
-	"github.com/advanderveer/go-httpio/encoding/middleware"
 	"github.com/gorilla/schema"
 )
 
@@ -30,7 +28,7 @@ func (i *valTestInput) Validate() error {
 	return nil
 }
 
-type testInput struct {
+type testInput2 struct {
 	Name     string `json:"json-name" schema:"form-name" validate:"ascii"`
 	Position string `json:"position" schema:"position"`
 }
@@ -39,8 +37,8 @@ type testOutput struct {
 	Result string `json:"result,omitempty"`
 }
 
-var stdQueryWare = func(next middleware.Transformer) middleware.Transformer {
-	return middleware.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
+var stdQueryWare = func(next httpio.Transformer) httpio.Transformer {
+	return httpio.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
 		vals := r.URL.Query()
 		if len(vals) > 0 {
 			dec := schema.NewDecoder()
@@ -54,8 +52,8 @@ var stdQueryWare = func(next middleware.Transformer) middleware.Transformer {
 	})
 }
 
-var stdErrWare = func(next middleware.Transformer) middleware.Transformer {
-	return middleware.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
+var stdErrWare = func(next httpio.Transformer) httpio.Transformer {
+	return httpio.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
 		if err, ok := a.(error); ok {
 			a = struct {
 				Message string `json:"message"` //give the error response shape
@@ -63,22 +61,22 @@ var stdErrWare = func(next middleware.Transformer) middleware.Transformer {
 
 			w.Header().Set("X-Has-Handling-Error", "1")
 			errStatus := http.StatusInternalServerError
-			if middleware.IsDecodeErr(err) {
+			if httpio.IsDecodeErr(err) {
 				errStatus = http.StatusBadRequest
 			}
 
-			return next.Transform(a, r.WithContext(middleware.WithStatus(r.Context(), errStatus)), w) //set a status code
+			return next.Transform(a, r.WithContext(httpio.WithStatus(r.Context(), errStatus)), w) //set a status code
 		}
 
 		return next.Transform(a, r, w)
 	})
 }
 
-func newStdIO() *middleware.Ingress {
-	j := &middleware.JSON{}
-	egress := middleware.NewEgress(j)
+func newStdIO() *httpio.Ingress {
+	j := &httpio.JSON{}
+	egress := httpio.NewEgress(j)
 	egress.Use(stdErrWare)
-	ingress := middleware.NewIngress(egress, j, middleware.NewFormDecoding(schema.NewDecoder()))
+	ingress := httpio.NewIngress(egress, j, httpio.NewFormDecoding(schema.NewDecoder()))
 	ingress.Use(stdQueryWare)
 	return ingress
 }
@@ -89,12 +87,12 @@ func TestClientUsage(t *testing.T) {
 		Method    string
 		Path      string
 		Hdr       http.Header
-		Ingress   *middleware.Ingress
-		Input     *testInput
+		Ingress   *httpio.Ingress
+		Input     *testInput2
 		Output    *testOutput
 		ExpErr    error
 		ExpOutput *testOutput
-		Impl      func(context.Context, *testInput) (*testOutput, error)
+		Impl      func(context.Context, *testInput2) (*testOutput, error)
 	}{
 		{
 			Name:      "nil output",
@@ -103,7 +101,7 @@ func TestClientUsage(t *testing.T) {
 			ExpOutput: &testOutput{},
 			Path:      "",
 			Ingress:   newStdIO(),
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return nil, nil
 			},
 		},
@@ -115,21 +113,21 @@ func TestClientUsage(t *testing.T) {
 			ExpErr:    errors.New("foo"),
 			Path:      "",
 			Ingress:   newStdIO(),
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return nil, errors.New("foo")
 			},
 		},
 	} {
 		t.Run(c.Name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				in := &testInput{}
+				in := &testInput2{}
 				if render, valid := c.Ingress.Handle(w, r, in); valid {
 					render(c.Impl(r.Context(), in))
 				}
 			}))
 			defer ts.Close()
 
-			client, err := httpio.NewClient(ts.Client(), ts.URL, &encoding.JSON{})
+			client, err := httpio.NewClient(ts.Client(), ts.URL, &httpio.JSON{}, &httpio.JSON{})
 			if err != nil {
 				t.Fatal("failed to create client:", err)
 			}
@@ -153,8 +151,8 @@ func TestUsageWithoutClient(t *testing.T) {
 		Path      string
 		Hdr       http.Header
 		Body      io.Reader
-		Ingress   *middleware.Ingress
-		Impl      func(context.Context, *testInput) (*testOutput, error)
+		Ingress   *httpio.Ingress
+		Impl      func(context.Context, *testInput2) (*testOutput, error)
 		ExpBody   string
 		ExpStatus int
 		ExpHdr    http.Header
@@ -168,7 +166,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			ExpBody:   `{}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return &testOutput{}, nil
 			},
 		},
@@ -181,7 +179,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			ExpBody:   `null` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return nil, nil
 			},
 		},
@@ -197,7 +195,7 @@ func TestUsageWithoutClient(t *testing.T) {
 				"Content-Type":         []string{"application/json; charset=utf-8"},
 				"X-Has-Handling-Error": []string{"1"},
 			},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return nil, errors.New("foo")
 			},
 		},
@@ -211,7 +209,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			ExpBody:   `{"result":"bardirector"}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return &testOutput{Result: in.Name + in.Position}, nil
 			},
 		},
@@ -225,7 +223,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			ExpBody:   `{"result":"bardirector"}` + "\n",
 			ExpStatus: http.StatusOK,
 			ExpHdr:    http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return &testOutput{Result: in.Name + in.Position}, nil
 			},
 		},
@@ -242,7 +240,7 @@ func TestUsageWithoutClient(t *testing.T) {
 				"Content-Type":         []string{"application/json; charset=utf-8"},
 				"X-Has-Handling-Error": []string{"1"},
 			},
-			Impl: func(ctx context.Context, in *testInput) (*testOutput, error) {
+			Impl: func(ctx context.Context, in *testInput2) (*testOutput, error) {
 				return &testOutput{Result: in.Name + in.Position}, nil
 			},
 		},
@@ -252,7 +250,7 @@ func TestUsageWithoutClient(t *testing.T) {
 			r, _ := http.NewRequest(c.Method, c.Path, c.Body)
 			r.Header = c.Hdr
 			func(w http.ResponseWriter, r *http.Request) {
-				in := &testInput{}
+				in := &testInput2{}
 				if render, valid := c.Ingress.Handle(w, r, in); valid {
 					render(c.Impl(r.Context(), in))
 				}

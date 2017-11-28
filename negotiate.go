@@ -7,7 +7,7 @@
 //NOTE: Copied over from github.com/golang/gddo until stdlib
 //implements this: https://github.com/golang/go/issues/19307
 
-package handling
+package httpio
 
 import (
 	"net/http"

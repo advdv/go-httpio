@@ -1,4 +1,4 @@
-package middleware_test
+package httpio_test
 
 import (
 	"bytes"
@@ -11,14 +11,12 @@ import (
 
 	validator "gopkg.in/go-playground/validator.v9"
 
-	"github.com/advanderveer/go-httpio/encoding"
-	"github.com/advanderveer/go-httpio/encoding/middleware"
-	"github.com/advanderveer/go-httpio/handling"
+	httpio "github.com/advanderveer/go-httpio"
 	"github.com/gorilla/schema"
 )
 
-var queryParse = func(next middleware.Transformer) middleware.Transformer {
-	return middleware.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
+var queryParse = func(next httpio.Transformer) httpio.Transformer {
+	return httpio.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
 		vals := r.URL.Query()
 		if len(vals) > 0 {
 			dec := schema.NewDecoder()
@@ -32,8 +30,8 @@ var queryParse = func(next middleware.Transformer) middleware.Transformer {
 	})
 }
 
-var validateIngress = func(next middleware.Transformer) middleware.Transformer {
-	return middleware.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
+var validateIngress = func(next httpio.Transformer) httpio.Transformer {
+	return httpio.TransFunc(func(a interface{}, r *http.Request, w http.ResponseWriter) error {
 		val := validator.New()
 		err := val.Struct(a)
 		if err != nil {
@@ -52,8 +50,8 @@ type testInput struct {
 func TestDefaultParse(t *testing.T) {
 	for _, c := range []struct {
 		Name     string
-		Wares    []middleware.Transware
-		Others   []middleware.DecoderFactory
+		Wares    []httpio.Transware
+		Others   []httpio.DecoderFactory
 		Method   string
 		Path     string
 		Body     string
@@ -81,14 +79,14 @@ func TestDefaultParse(t *testing.T) {
 		},
 		{
 			Name:     "GET with query should decode using form middleware",
-			Wares:    []middleware.Transware{queryParse},
+			Wares:    []httpio.Transware{queryParse},
 			Method:   http.MethodGet,
 			Path:     "?name=foo",
 			ExpInput: &testInput{Name: "foo"},
 		},
 		{
 			Name:     "POST with query should overwrite partially",
-			Wares:    []middleware.Transware{queryParse},
+			Wares:    []httpio.Transware{queryParse},
 			Method:   http.MethodPost,
 			Path:     "?name=foo&form-image=overwritten",
 			Headers:  http.Header{"Content-Type": []string{"application/json"}},
@@ -97,7 +95,7 @@ func TestDefaultParse(t *testing.T) {
 		},
 		{
 			Name:     "Early error middleware should cause error",
-			Wares:    []middleware.Transware{earlyReturnErrWare},
+			Wares:    []httpio.Transware{earlyReturnErrWare},
 			Method:   http.MethodGet,
 			Path:     "?name=foo",
 			ExpInput: &testInput{},
@@ -105,8 +103,8 @@ func TestDefaultParse(t *testing.T) {
 		},
 		{
 			Name:     "Form POST with query should overwrite partially",
-			Wares:    []middleware.Transware{queryParse},
-			Others:   []middleware.DecoderFactory{middleware.NewFormDecoding(schema.NewDecoder())},
+			Wares:    []httpio.Transware{queryParse},
+			Others:   []httpio.DecoderFactory{httpio.NewFormDecoding(schema.NewDecoder())},
 			Method:   http.MethodPost,
 			Path:     "?name=foo&form-image=overwritten",
 			Headers:  http.Header{"Content-Type": []string{"application/x-www-form-urlencoded"}},
@@ -116,7 +114,7 @@ func TestDefaultParse(t *testing.T) {
 		{
 			Name:     "Validation middleware should work on json",
 			Method:   http.MethodPost,
-			Wares:    []middleware.Transware{validateIngress},
+			Wares:    []httpio.Transware{validateIngress},
 			Headers:  http.Header{"Content-Type": []string{"application/json"}},
 			Body:     `{"json-image": "Ïd"}`,
 			ExpErr:   errors.New("Key: 'testInput.Image' Error:Field validation for 'Image' failed on the 'ascii' tag"),
@@ -136,9 +134,9 @@ func TestDefaultParse(t *testing.T) {
 
 			r.Header = c.Headers
 			in := &testInput{}
-			j := &middleware.JSON{}
-			egress := middleware.NewEgress(j)
-			ingress := middleware.NewIngress(egress, j, c.Others...)
+			j := &httpio.JSON{}
+			egress := httpio.NewEgress(j)
+			ingress := httpio.NewIngress(egress, j, c.Others...)
 			ingress.Use(c.Wares...)
 
 			err = ingress.Parse(r, in)
@@ -154,13 +152,12 @@ func TestDefaultParse(t *testing.T) {
 }
 
 func TestParseIntoNil(t *testing.T) {
-	h := handling.NewH(
-		encoding.NewStack(encoding.NewFormEncoding(schema.NewEncoder(), schema.NewDecoder())),
-	)
-
+	j := &httpio.JSON{}
+	egress := httpio.NewEgress(j)
+	ingress := httpio.NewIngress(egress, j)
 	r, _ := http.NewRequest("GET", "", nil)
 
-	err := h.Parse(r, nil)
+	err := ingress.Parse(r, nil)
 	if err != nil {
 		t.Fatal("parsing into nil should be no-op")
 	}

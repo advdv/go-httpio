@@ -1,4 +1,4 @@
-package middleware
+package httpio
 
 import (
 	"fmt"
